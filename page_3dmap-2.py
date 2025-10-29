@@ -81,44 +81,51 @@ fig.update_geos(
 # --- 3. 在 Streamlit 中顯示 ---
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 設定您的 DEM 檔案名稱 ---
-DEM_FILE_PATH = '/workspaces/1029streamlit-3Dwebmaps/DEM_tawiwan_V2025.tif'
+DEM_FILE_PATH = 'DEM_tawiwan_V2025.tif'
+
 st.title("Plotly 3D 地形圖 (台灣 DEM 數據)")
+st.caption(f"數據來源: {DEM_FILE_PATH}")
 
 # --- 1. 讀取 DEM TIF 資料 ---
-@st.cache_data # 使用 Streamlit 快取避免每次程式碼執行時都重新讀取大型檔案
+# 使用 Streamlit 快取避免每次程式碼執行時都重新讀取大型檔案
+@st.cache_data
 def load_dem_data(file_path):
     try:
         # 使用 rasterio 讀取 TIF 檔案
         with rasterio.open(file_path) as src:
-            # 讀取高程數據（Z 軸）
+            # 讀取高程數據（Z 軸）。read(1) 讀取第一個波段。
             Z = src.read(1)
-            # 獲取地理空間資訊 (用於 X, Y 軸)
-            transform = src.transform
             
-            # 計算 X 和 Y 座標（通常是經緯度或投影座標）
             # 獲取 TIF 陣列的維度
             rows, cols = Z.shape
             
-            # 建立 X 軸和 Y 軸的座標點
-            # rasterio.transform.xy() 可以根據網格索引計算出真實座標
-            # 這裡我們只取邊緣的座標來定義範圍
+            # --- 修正 2：使用 src.bounds 獲取邊界座標 (更穩定) ---
+            # bounds 提供了 (left, bottom, right, top)
+            bounds = src.bounds
             
-            # 計算左上角和右下角的地理座標
-            lon_min, lat_max = src.xy(0, 0)
-            lon_max, lat_min = src.xy(rows - 1, cols - 1)
+            lon_min = bounds.left   # 最小經度 (X min)
+            lat_min = bounds.bottom # 最小緯度 (Y min)
+            lon_max = bounds.right  # 最大經度 (X max)
+            lat_max = bounds.top    # 最大緯度 (Y max)
             
-            # 建立對應 Z 陣列的 X 和 Y 軸座標序列
+            # 建立對應 Z 陣列的 X (經度/lon) 和 Y (緯度/lat) 軸座標序列
+            # 經度 X 軸有 cols 個點
             lon = np.linspace(lon_min, lon_max, cols)
+            # 緯度 Y 軸有 rows 個點。注意：Y 軸 (緯度) 通常是從北 (大) 到南 (小)
+            # 因此，我們需要從 lat_max 到 lat_min 建立序列
             lat = np.linspace(lat_max, lat_min, rows)
             
-            return Z, lon, lat, src.crs.name # 額外返回座標系統名稱
+            # 獲取座標系統名稱
+            crs_name = src.crs.name
+            
+            return Z, lon, lat, crs_name
             
     except rasterio.errors.RasterioIOError:
-        st.error(f"錯誤：無法讀取檔案 '{file_path}'，請確認檔案名稱和路徑是否正確。")
+        st.error(f"錯誤：無法讀取檔案 '{file_path}'。請確認檔案名稱和路徑是否正確。")
         return None, None, None, None
     except Exception as e:
         st.error(f"讀取 TIF 檔案時發生未知錯誤: {e}")
+        # st.error(f"詳細錯誤資訊: {type(e).__name__}: {e}") # 輸出詳細錯誤類型
         return None, None, None, None
 
 Z, lon_coords, lat_coords, crs_name = load_dem_data(DEM_FILE_PATH)
@@ -126,36 +133,40 @@ Z, lon_coords, lat_coords, crs_name = load_dem_data(DEM_FILE_PATH)
 if Z is not None:
     
     # 處理 DEM 數據中常見的 NoData 值
-    # 假設 NoData 值為極小的負數或 -9999 (請根據您的數據實際情況調整)
+    # 將所有小於 0 的值 (常見的 NoData 標記) 替換為 NaN
+    # 也可以使用 src.nodata 屬性來確認並處理
     Z[Z < 0] = np.nan 
     
     # --- 2. 建立 3D Surface 圖 ---
     fig = go.Figure(
         data=[
             go.Surface(
-                z=Z,                  # 讀取到的高程陣列 (Z 軸)
-                x=lon_coords,         # 經度/X 座標 (X 軸)
-                y=lat_coords,         # 緯度/Y 座標 (Y 軸)
+                z=Z,                   # 讀取到的高程陣列 (Z 軸)
+                x=lon_coords,          # 經度/X 座標 (X 軸)
+                y=lat_coords,          # 緯度/Y 座標 (Y 軸)
                 
                 # 讓 Z 軸的顏色依據高度變化
-                colorscale="Terrain", 
+                colorscale="Terrain",  # 適合地形的顏色漸層
                 showscale=True,
+                colorbar_title='海拔 (公尺)' # 顏色條標題
             )
         ]
     )
 
     # --- 3. 調整 3D 視角和外觀 ---
     fig.update_layout(
-        title=f"台灣地形 3D 曲面圖 (資料來自 {DEM_FILE_PATH}, 坐標系: {crs_name})",
-        width=800,
+        title=f"台灣地形 3D 曲面圖 (坐標系: {crs_name})",
+        # 讓圖表更寬，佔滿 Streamlit 容器
+        width=None,
         height=700,
         scene=dict(
             xaxis_title='經度 / X 座標',
             yaxis_title='緯度 / Y 座標',
             zaxis_title='海拔高度 (公尺)',
             
-            # 調整視覺比例，讓地形看起來更真實或誇張
-            aspectratio=dict(x=1, y=1, z=0.5), # z=0.5 誇大了垂直高度
+            # 調整視覺比例，讓垂直高度 (Z) 略微誇張，以增強視覺效果
+            # 建議將 X/Y 比例調整為與實際 DEM 範圍一致，這裡暫時維持
+            aspectratio=dict(x=1, y=1, z=0.4), 
             aspectmode='manual'
         )
     )
@@ -165,6 +176,8 @@ if Z is not None:
 
     # 顯示一些數據資訊
     st.sidebar.header("DEM 數據資訊")
-    st.sidebar.write(f"陣列大小: {Z.shape[1]} x {Z.shape[0]}")
+    st.sidebar.write(f"陣列維度: {Z.shape[1]} x {Z.shape[0]}")
+    st.sidebar.write(f"座標系統: {crs_name}")
+    # 使用 np.nanmax/min 忽略 NaN 值
     st.sidebar.write(f"最大高度: {np.nanmax(Z):.2f} 公尺")
     st.sidebar.write(f"最小高度: {np.nanmin(Z):.2f} 公尺")
