@@ -83,10 +83,8 @@ st.plotly_chart(fig, use_container_width=True)
 
 # --- 設定您的 DEM 檔案名稱 (字串，無需 pd.read_tif) ---
 # 請確認此檔案名稱與您的 TIF 檔案完全一致，且檔案位於相同的目錄中。
-DEM_FILE_PATH = 'DEM_tawiwan_V2025.tif'
-
+DEM_FILE_PATH = 'twdtm_asterV2_30m.tif'
 st.title("Plotly 3D 地形圖 (台灣 DEM 數據)")
-st.caption(f"數據來源: {DEM_FILE_PATH}")
 
 # --- 1. 讀取 DEM TIF 資料 ---
 @st.cache_data
