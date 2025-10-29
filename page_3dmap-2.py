@@ -7,7 +7,7 @@ import pandas as pd
 st.title("Plotly 3D 地圖 (向量 - 地球儀)")
 
 # --- 1. 載入 Plotly 內建的範例資料 ---
-df = pd.read_csv(老化指數.csv).query("西元年 == 2020")
+df = pd.read_csv('老化指數.csv').query("西元年 == 2020")
 # px.data 提供了幾個內建的範例資料集，方便使用者練習或展示。
 # gapminder() 是其中一個內建函式，它會載入著名的 Gapminder 資料集。
 # 這個資料集包含了世界各國多年的平均壽命 (lifeExp)、人均 GDP (gdpPercap) 和人口 (pop) 等數據。
