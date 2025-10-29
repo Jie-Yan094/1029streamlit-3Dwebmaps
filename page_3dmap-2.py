@@ -82,7 +82,7 @@ fig.update_geos(
 st.plotly_chart(fig, use_container_width=True)
 
 # --- 設定您的 DEM 檔案名稱 ---
-DEM_FILE_PATH = 'DEM_tawiwan_V2025.tif'
+DEM_FILE_PATH = '/workspaces/1029streamlit-3Dwebmaps/DEM_tawiwan_V2025.tif'
 st.title("Plotly 3D 地形圖 (台灣 DEM 數據)")
 
 # --- 1. 讀取 DEM TIF 資料 ---
