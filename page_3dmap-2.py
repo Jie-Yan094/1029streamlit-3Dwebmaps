@@ -80,58 +80,95 @@ fig.update_geos(
 # --- 3. 在 Streamlit 中顯示 ---
 st.plotly_chart(fig, use_container_width=True)
 
-st.title("Plotly 3D 地圖 (網格 - DEM 表面)")
+import streamlit as st
+import plotly.graph_objects as go
+import rasterio
+import numpy as np
 
-# --- 1. 讀取範例 DEM 資料 ---
-# Plotly 內建的 "volcano" (火山) DEM 數據 (儲存為 CSV)
-# 這是一個 2D 陣列 (Grid)，每個格子的值就是海拔
-z_data = pd.read_csv("https://raw.githubusercontent.com/plotly/datasets/master/api_docs/mt_bruno_elevation.csv")
+# --- 設定您的 DEM 檔案名稱 ---
+DEM_FILE_PATH = "DEM_tawiwan_V2025.tif"  # <-- 請將此處替換為您的 .tif 檔案名稱
+st.title("Plotly 3D 地形圖 (台灣 DEM 數據)")
 
-# --- 2. 建立 3D Surface 圖 ---
-# 建立一個 Plotly 的 Figure 物件，它是所有圖表元素的容器
-fig = go.Figure(
-    # data 參數接收一個包含所有 "trace" (圖形軌跡) 的列表。
-    # 每個 trace 定義了一組數據以及如何繪製它。
-    data=[
-        # 建立一個 Surface (曲面) trace
-        go.Surface(
-            # *** 關鍵參數：z ***
-            # z 參數需要一個 2D 陣列 (或列表的列表)，代表在 X-Y 平面上每個點的高度值。
-            # z_data.values 會提取 pandas DataFrame 底層的 NumPy 2D 陣列。
-            # Plotly 會根據這個 2D 陣列的結構來繪製 3D 曲面。
-            z=z_data.values,
+# --- 1. 讀取 DEM TIF 資料 ---
+@st.cache_data # 使用 Streamlit 快取避免每次程式碼執行時都重新讀取大型檔案
+def load_dem_data(file_path):
+    try:
+        # 使用 rasterio 讀取 TIF 檔案
+        with rasterio.open(file_path) as src:
+            # 讀取高程數據（Z 軸）
+            Z = src.read(1)
+            # 獲取地理空間資訊 (用於 X, Y 軸)
+            transform = src.transform
+            
+            # 計算 X 和 Y 座標（通常是經緯度或投影座標）
+            # 獲取 TIF 陣列的維度
+            rows, cols = Z.shape
+            
+            # 建立 X 軸和 Y 軸的座標點
+            # rasterio.transform.xy() 可以根據網格索引計算出真實座標
+            # 這裡我們只取邊緣的座標來定義範圍
+            
+            # 計算左上角和右下角的地理座標
+            lon_min, lat_max = src.xy(0, 0)
+            lon_max, lat_min = src.xy(rows - 1, cols - 1)
+            
+            # 建立對應 Z 陣列的 X 和 Y 軸座標序列
+            lon = np.linspace(lon_min, lon_max, cols)
+            lat = np.linspace(lat_max, lat_min, rows)
+            
+            return Z, lon, lat, src.crs.name # 額外返回座標系統名稱
+            
+    except rasterio.errors.RasterioIOError:
+        st.error(f"錯誤：無法讀取檔案 '{file_path}'，請確認檔案名稱和路徑是否正確。")
+        return None, None, None, None
+    except Exception as e:
+        st.error(f"讀取 TIF 檔案時發生未知錯誤: {e}")
+        return None, None, None, None
 
-            # colorscale 參數指定用於根據 z 值 (高度) 對曲面進行著色的顏色映射方案。
-            # "Viridis" 是 Plotly 提供的一個常用且視覺效果良好的顏色漸層。
-            # 高度值較低和較高的點會有不同的顏色。
-            colorscale="Viridis"
-        )
-    ] # data 列表結束
-)
+Z, lon_coords, lat_coords, crs_name = load_dem_data(DEM_FILE_PATH)
 
-# --- 3. 調整 3D 視角和外觀 ---
-# 使用 update_layout 方法來修改圖表的整體佈局和外觀設定
-fig.update_layout(
-    # 設定圖表的標題文字
-    title="Mt. Bruno 火山 3D 地形圖 (可旋轉)",
-
-    # 設定圖表的寬度和高度 (單位：像素)
-    width=800,
-    height=700,
-
-    # scene 參數是一個字典，用於配置 3D 圖表的場景 (座標軸、攝影機視角等)
-    scene=dict(
-        # 設定 X, Y, Z 座標軸的標籤文字
-        xaxis_title='經度 (X)',
-        yaxis_title='緯度 (Y)',
-        zaxis_title='海拔 (Z)'
-        # 可以在 scene 字典中加入更多參數來控制攝影機初始位置、座標軸範圍等
+if Z is not None:
+    
+    # 處理 DEM 數據中常見的 NoData 值
+    # 假設 NoData 值為極小的負數或 -9999 (請根據您的數據實際情況調整)
+    Z[Z < 0] = np.nan 
+    
+    # --- 2. 建立 3D Surface 圖 ---
+    fig = go.Figure(
+        data=[
+            go.Surface(
+                z=Z,                  # 讀取到的高程陣列 (Z 軸)
+                x=lon_coords,         # 經度/X 座標 (X 軸)
+                y=lat_coords,         # 緯度/Y 座標 (Y 軸)
+                
+                # 讓 Z 軸的顏色依據高度變化
+                colorscale="Terrain", 
+                showscale=True,
+            )
+        ]
     )
-)
 
-# 這段程式碼執行後，變數 `fig` 將包含一個設定好的 3D Surface Plotly 圖表物件。
-# 你可以接著使用 fig.show() 或 st.plotly_chart(fig) 將其顯示出來。
-# 這個圖表通常是互動式的，允許使用者用滑鼠旋轉、縮放和平移 3D 視角。
+    # --- 3. 調整 3D 視角和外觀 ---
+    fig.update_layout(
+        title=f"台灣地形 3D 曲面圖 (資料來自 {DEM_FILE_PATH}, 坐標系: {crs_name})",
+        width=800,
+        height=700,
+        scene=dict(
+            xaxis_title='經度 / X 座標',
+            yaxis_title='緯度 / Y 座標',
+            zaxis_title='海拔高度 (公尺)',
+            
+            # 調整視覺比例，讓地形看起來更真實或誇張
+            aspectratio=dict(x=1, y=1, z=0.5), # z=0.5 誇大了垂直高度
+            aspectmode='manual'
+        )
+    )
 
-# --- 4. 在 Streamlit 中顯示 ---
-st.plotly_chart(fig)
+    # --- 4. 在 Streamlit 中顯示 ---
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 顯示一些數據資訊
+    st.sidebar.header("DEM 數據資訊")
+    st.sidebar.write(f"陣列大小: {Z.shape[1]} x {Z.shape[0]}")
+    st.sidebar.write(f"最大高度: {np.nanmax(Z):.2f} 公尺")
+    st.sidebar.write(f"最小高度: {np.nanmin(Z):.2f} 公尺")
