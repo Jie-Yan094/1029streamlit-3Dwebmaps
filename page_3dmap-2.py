@@ -81,13 +81,13 @@ fig.update_geos(
 # --- 3. 在 Streamlit 中顯示 ---
 st.plotly_chart(fig, use_container_width=True)
 
+# --- 設定您的 DEM 檔案名稱 (字串，無需 pd.read_tif) ---
 DEM_FILE_PATH = 'DEM_tawiwan_V2025.tif'
 
 st.title("Plotly 3D 地形圖 (台灣 DEM 數據)")
 st.caption(f"數據來源: {DEM_FILE_PATH}")
 
 # --- 1. 讀取 DEM TIF 資料 ---
-# 使用 Streamlit 快取避免每次程式碼執行時都重新讀取大型檔案
 @st.cache_data
 def load_dem_data(file_path):
     try:
@@ -96,11 +96,18 @@ def load_dem_data(file_path):
             # 讀取高程數據（Z 軸）。read(1) 讀取第一個波段。
             Z = src.read(1)
             
-            # 獲取 TIF 陣列的維度
+            # --- 關鍵診斷點 A：檢查 Z 陣列是否包含數據 ---
             rows, cols = Z.shape
+            if rows == 0 or cols == 0:
+                st.error(f"錯誤：TIF 檔案 '{file_path}' 讀取到的陣列維度為 {rows}x{cols} (空的)。")
+                st.markdown("---")
+                st.markdown("#### 診斷建議：")
+                st.markdown("1. 您的 `.tif` 檔案可能過大，請嘗試使用 GIS 工具（如 QGIS）**裁剪**一個較小的區域。")
+                st.markdown("2. 確認 `.tif` 檔案不是損壞的，且包含有效的高程數據。")
+                return None, None, None, None
+            # --- 關鍵診斷點 A 結束 ---
             
-            # --- 修正 2：使用 src.bounds 獲取邊界座標 (更穩定) ---
-            # bounds 提供了 (left, bottom, right, top)
+            # 獲取邊界座標 (left, bottom, right, top)
             bounds = src.bounds
             
             lon_min = bounds.left   # 最小經度 (X min)
@@ -109,10 +116,8 @@ def load_dem_data(file_path):
             lat_max = bounds.top    # 最大緯度 (Y max)
             
             # 建立對應 Z 陣列的 X (經度/lon) 和 Y (緯度/lat) 軸座標序列
-            # 經度 X 軸有 cols 個點
             lon = np.linspace(lon_min, lon_max, cols)
-            # 緯度 Y 軸有 rows 個點。注意：Y 軸 (緯度) 通常是從北 (大) 到南 (小)
-            # 因此，我們需要從 lat_max 到 lat_min 建立序列
+            # Y 軸從高 (北) 到低 (南) 建立序列
             lat = np.linspace(lat_max, lat_min, rows)
             
             # 獲取座標系統名稱
@@ -121,20 +126,25 @@ def load_dem_data(file_path):
             return Z, lon, lat, crs_name
             
     except rasterio.errors.RasterioIOError:
-        st.error(f"錯誤：無法讀取檔案 '{file_path}'。請確認檔案名稱和路徑是否正確。")
+        st.error(f"錯誤：無法讀取檔案 '{file_path}'。請檢查檔案名稱和路徑。")
         return None, None, None, None
     except Exception as e:
+        # st.error(f"讀取 TIF 檔案時發生未知錯誤: {type(e).__name__}: {e}")
         st.error(f"讀取 TIF 檔案時發生未知錯誤: {e}")
-        # st.error(f"詳細錯誤資訊: {type(e).__name__}: {e}") # 輸出詳細錯誤類型
         return None, None, None, None
 
 Z, lon_coords, lat_coords, crs_name = load_dem_data(DEM_FILE_PATH)
 
 if Z is not None:
     
+    # --- 關鍵診斷點 B：再次確認 Z 陣列的有效性 ---
+    if Z.size == 0 or np.all(np.isnan(Z)):
+        st.error("錯誤：讀取到的高程陣列是空的或全部為 NoData 值。請檢查您的 TIF 檔案內容。")
+        st.stop()
+    # --- 關鍵診斷點 B 結束 ---
+    
     # 處理 DEM 數據中常見的 NoData 值
     # 將所有小於 0 的值 (常見的 NoData 標記) 替換為 NaN
-    # 也可以使用 src.nodata 屬性來確認並處理
     Z[Z < 0] = np.nan 
     
     # --- 2. 建立 3D Surface 圖 ---
@@ -156,7 +166,6 @@ if Z is not None:
     # --- 3. 調整 3D 視角和外觀 ---
     fig.update_layout(
         title=f"台灣地形 3D 曲面圖 (坐標系: {crs_name})",
-        # 讓圖表更寬，佔滿 Streamlit 容器
         width=None,
         height=700,
         scene=dict(
@@ -165,7 +174,6 @@ if Z is not None:
             zaxis_title='海拔高度 (公尺)',
             
             # 調整視覺比例，讓垂直高度 (Z) 略微誇張，以增強視覺效果
-            # 建議將 X/Y 比例調整為與實際 DEM 範圍一致，這裡暫時維持
             aspectratio=dict(x=1, y=1, z=0.4), 
             aspectmode='manual'
         )
@@ -176,8 +184,7 @@ if Z is not None:
 
     # 顯示一些數據資訊
     st.sidebar.header("DEM 數據資訊")
-    st.sidebar.write(f"陣列維度: {Z.shape[1]} x {Z.shape[0]}")
+    st.sidebar.write(f"陣列維度 (Cols x Rows): {Z.shape[1]} x {Z.shape[0]}")
     st.sidebar.write(f"座標系統: {crs_name}")
-    # 使用 np.nanmax/min 忽略 NaN 值
     st.sidebar.write(f"最大高度: {np.nanmax(Z):.2f} 公尺")
     st.sidebar.write(f"最小高度: {np.nanmin(Z):.2f} 公尺")
