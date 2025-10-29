@@ -7,7 +7,7 @@ import pandas as pd
 st.title("Plotly 3D 地圖 (向量 - 地球儀)")
 
 # --- 1. 載入 Plotly 內建的範例資料 ---
-df = px.data.gapminder().query("year == 2007")
+df = pd.read_csv(老化指數.csv).query("西元年 == 2020")
 # px.data 提供了幾個內建的範例資料集，方便使用者練習或展示。
 # gapminder() 是其中一個內建函式，它會載入著名的 Gapminder 資料集。
 # 這個資料集包含了世界各國多年的平均壽命 (lifeExp)、人均 GDP (gdpPercap) 和人口 (pop) 等數據。
@@ -17,10 +17,10 @@ df = px.data.gapminder().query("year == 2007")
 # --- 2. 建立 3D 地理散點圖 (scatter_geo) ---
 fig = px.scatter_geo(
     df,
-    locations="iso_alpha",  # 國家代碼
-    color="continent",      # 依據大陸洲別上色
-    hover_name="country",   # 滑鼠懸停時顯示國家名稱
-    size="pop",             # 點的大小代表人口數
+    locations="國別",  # 國家代碼
+    color="國別",      # 依據大陸洲別上色
+    hover_name="國別",   # 滑鼠懸停時顯示國家名稱
+    size="老化指數",             # 點的大小代表人口數
 
     # *** 關鍵：使用 "orthographic" 投影法來建立 3D 地球儀 ***
     projection="orthographic"
