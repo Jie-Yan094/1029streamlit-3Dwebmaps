@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+import rasterio
 import numpy as np # 導入 numpy 用於處理 NaN
 
 st.title("Plotly 3D 地圖 (向量 - 地球儀)")
@@ -80,13 +81,8 @@ fig.update_geos(
 # --- 3. 在 Streamlit 中顯示 ---
 st.plotly_chart(fig, use_container_width=True)
 
-import streamlit as st
-import plotly.graph_objects as go
-import rasterio
-import numpy as np
-
 # --- 設定您的 DEM 檔案名稱 ---
-DEM_FILE_PATH = "DEM_tawiwan_V2025.tif"  # <-- 請將此處替換為您的 .tif 檔案名稱
+DEM_FILE_PATH = '/workspaces/1029streamlit-3Dwebmaps/DEM_tawiwan_V2025.tif'
 st.title("Plotly 3D 地形圖 (台灣 DEM 數據)")
 
 # --- 1. 讀取 DEM TIF 資料 ---
