@@ -8,4 +8,4 @@ rasterio
 xarray
 localtileserver
 rasterio
-geopandas
+plotly.graph_objects
