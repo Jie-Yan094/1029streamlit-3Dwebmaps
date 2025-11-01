@@ -32,18 +32,11 @@ layer_hexagon = pdk.Layer(
     'HexagonLayer',
     data=data,
     get_position=f'[{lon_col}, {lat_col}]', 
-    
-    # ⬇️ 關鍵調整點：嘗試改變這個數值 ⬇️
-    radius=1500, # 嘗試從 300 調整為 400 或 200 
-    
-    elevation_scale=5,
+    radius=100,
+    elevation_scale=4,
     elevation_range=[0, 1000],
     pickable=True,
     extruded=True,
-    color_range=[
-        [255, 255, 178, 20], [255, 237, 160, 100], [254, 201, 128, 150],
-        [252, 141, 60, 180], [227, 76, 76, 210], [189, 0, 38, 255]
-    ]
 )
 
 # --- 3. 設定攝影機視角 (View State) ---
