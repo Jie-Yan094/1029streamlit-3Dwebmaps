@@ -85,6 +85,8 @@ except Exception as e:
     st.error(f"讀取或處理 CSV 發生錯誤: {e}")
     st.stop()
 
+st.write(f"他好慢我們等他一下......")
+
 # --- 2. 設定 Pydeck 圖層 (GridLayer) ---
 layer_grid = pdk.Layer(
     'GridLayer',
