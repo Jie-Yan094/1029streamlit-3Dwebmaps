@@ -2,43 +2,83 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pydeck as pdk
+import geopandas as gpd
 
 st.title("Pydeck 3D 地圖 (向量 - 密度圖)")
+# --- 1. 讀取真實的地理空間資料 (Shapefile) ---
 
-# --- 1. 生成範例資料 (向量) ---
-data = pd.DataFrame({
-    'lat': 25.0478 + np.random.randn(1000) / 50,
-    'lon': 121.5170 + np.random.randn(1000) / 50,
-})
+# ⚠️ 注意: 請將「臺北市老舊聚落分布圖 (WGS84座標).zip」
+#         放在與此 Python 腳本相同的目錄下執行。
+try:
+    zip_filename = "臺北市老舊聚落分布圖 (WGS84座標).zip"
+    
+    # 1.1 GeoPandas 可以直接從 zip 檔案讀取 Shapefile
+    gdf = gpd.read_file(f"zip://{zip_filename}")
+    
+    # 1.2 從 GeoDataFrame 的幾何欄位 (geometry) 提取經度和緯度
+    #     Pydeck 需要單獨的 lon/lat 欄位
+    gdf['lon'] = gdf.geometry.x
+    gdf['lat'] = gdf.geometry.y
+    
+    # 1.3 準備 Pydeck 所需的 DataFrame
+    #     我們只保留需要的欄位 (經度、緯度和其他屬性)
+    data = pd.DataFrame(gdf.drop(columns=['geometry']))
+    
+    # 設定欄位名稱
+    lon_col = 'lon'
+    lat_col = 'lat'
+
+    # 設定地圖中心點 (取數據的平均值作為中心點)
+    center_lat = data[lat_col].mean()
+    center_lon = data[lon_col].mean()
+    
+except Exception as e:
+    st.error(f"讀取 Shapefile 失敗或 GeoPandas 錯誤，請檢查 ZIP 檔案路徑或 GeoPandas 安裝: {e}")
+    st.info("暫時使用隨機資料顯示地圖。")
+    
+    # 如果讀取失敗，使用原程式碼的隨機資料作為備用
+    data = pd.DataFrame({
+        'lat': 25.0478 + np.random.randn(1000) / 50,
+        'lon': 121.5170 + np.random.randn(1000) / 50,
+    })
+    lon_col = 'lon'
+    lat_col = 'lat'
+    center_lat = 25.0478
+    center_lon = 121.5170 # 台北市預設中心
 
 # --- 2. 設定 Pydeck 圖層 (Layer) ---
-layer_hexagon = pdk.Layer( # 稍微改個名字避免混淆
+layer_hexagon = pdk.Layer(
     'HexagonLayer',
     data=data,
-    get_position='[lon, lat]',
-    radius=100,
-    elevation_scale=4,
+    # 使用提取出的經緯度欄位
+    get_position=f'[{lon_col}, {lat_col}]', 
+    radius=200, # 調整半徑以適應臺北市範圍
+    elevation_scale=5,
     elevation_range=[0, 1000],
     pickable=True,
     extruded=True,
+    # 可選: 調整顏色主題
+    # color_range=[[r, g, b, 255], ...]
 )
 
 # --- 3. 設定攝影機視角 (View State) ---
-view_state_hexagon = pdk.ViewState( # 稍微改個名字避免混淆
-    latitude=25.0478,
-    longitude=121.5170,
+view_state_hexagon = pdk.ViewState(
+    # 使用計算出的數據中心點，讓地圖更精確
+    latitude=center_lat,
+    longitude=center_lon,
     zoom=12,
     pitch=50,
 )
 
 # --- 4. 組合圖層和視角並顯示 (第一個地圖) ---
-r_hexagon = pdk.Deck( # 稍微改個名字避免混淆
+r_hexagon = pdk.Deck(
     layers=[layer_hexagon],
     initial_view_state=view_state_hexagon,
-    tooltip={"text": "這個區域有 {elevationValue} 個熱點"}
+    # HexagonLayer 的 elevationValue 代表該六邊形內包含的點數量
+    tooltip={"text": "此區域有 {elevationValue} 個老舊聚落"} 
 )
-st.pydeck_chart(r_hexagon)
 
+st.pydeck_chart(r_hexagon)
 
 # ===============================================
 #          第二個地圖：模擬 DEM
