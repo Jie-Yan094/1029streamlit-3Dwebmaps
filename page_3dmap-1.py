@@ -34,7 +34,7 @@ layer_hexagon = pdk.Layer(
     get_position=f'[{lon_col}, {lat_col}]', 
     
     # ⬇️ 關鍵調整點：嘗試改變這個數值 ⬇️
-    radius=500, # 嘗試從 300 調整為 400 或 200 
+    radius=700, # 嘗試從 300 調整為 400 或 200 
     
     elevation_scale=5,
     elevation_range=[0, 1000],
@@ -50,7 +50,7 @@ layer_hexagon = pdk.Layer(
 view_state_hexagon = pdk.ViewState(
     latitude=center_lat,
     longitude=center_lon,
-    zoom=11, # ⬇️ 嘗試調低 zoom，拉遠地圖
+    zoom=10, # ⬇️ 嘗試調低 zoom，拉遠地圖
     pitch=50,
 )
 
