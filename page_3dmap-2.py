@@ -64,7 +64,7 @@ if not available_years:
 default_year = 2020 if 2020 in available_years else available_years[0]
 
 selected_year = st.selectbox(
-    "請選擇要顯示的年份:",
+    "請選擇要顯示的年份(2020後為推估數值):",
     options=available_years,
     index=available_years.index(default_year) if default_year in available_years else 0
 )
