@@ -81,110 +81,50 @@ fig.update_geos(
 # --- 3. 在 Streamlit 中顯示 ---
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 設定您的 DEM 檔案名稱 (字串，無需 pd.read_tif) ---
-# 請確認此檔案名稱與您的 TIF 檔案完全一致，且檔案位於相同的目錄中。
-DEM_FILE_PATH = 'twdtm_asterV2_30m.tif'
-st.title("Plotly 3D 地形圖 (台灣 DEM 數據)")
+st.title("Plotly 3D 地圖 (網格 - DEM 表面)")
 
-# --- 1. 讀取 DEM TIF 資料 ---
-@st.cache_data
-def load_dem_data(file_path):
-    # 修正：使用 os 檢查檔案是否存在（雖然這裡沒有引入 os，但先加入提醒）
-    # 這裡假設 file_path 是正確的字串
-    try:
-        # 使用 rasterio 讀取 TIF 檔案
-        with rasterio.open(file_path) as src:
-            # 讀取高程數據（Z 軸）。read(1) 讀取第一個波段。
-            Z = src.read(1)
-            
-            # --- 關鍵診斷點 A：檢查 Z 陣列是否包含數據 ---
-            rows, cols = Z.shape
-            if rows == 0 or cols == 0:
-                st.error(f"錯誤：TIF 檔案 '{file_path}' 讀取到的陣列維度為 {rows}x{cols} (空的)。")
-                st.markdown("---")
-                st.markdown("#### 診斷建議：")
-                st.markdown("1. 您的 `.tif` 檔案可能過大，請嘗試使用 GIS 工具（如 QGIS）**裁剪**一個較小的區域。")
-                st.markdown("2. 確認 `.tif` 檔案不是損壞的，且包含有效的高程數據。")
-                return None, None, None, None
-            # --- 關鍵診斷點 A 結束 ---
-            
-            # 獲取邊界座標 (left, bottom, right, top)
-            bounds = src.bounds
-            
-            lon_min = bounds.left   # 最小經度 (X min)
-            lat_min = bounds.bottom # 最小緯度 (Y min)
-            lon_max = bounds.right  # 最大經度 (X max)
-            lat_max = bounds.top    # 最大緯度 (Y max)
-            
-            # 建立對應 Z 陣列的 X (經度/lon) 和 Y (緯度/lat) 軸座標序列
-            lon = np.linspace(lon_min, lon_max, cols)
-            # Y 軸從高 (北) 到低 (南) 建立序列
-            lat = np.linspace(lat_max, lat_min, rows)
-            
-            # 獲取座標系統名稱
-            crs_name = src.crs.name
-            
-            return Z, lon, lat, crs_name
-            
-    except rasterio.errors.RasterioIOError:
-        st.error(f"錯誤：無法讀取檔案 '{file_path}'。請檢查檔案名稱和路徑。")
-        return None, None, None, None
-    except Exception as e:
-        st.error(f"讀取 TIF 檔案時發生未知錯誤: {e}")
-        return None, None, None, None
+# --- 1. 讀取範例 DEM 資料 ---
+z_data = pd.read_csv("taipie.csv")
 
-Z, lon_coords, lat_coords, crs_name = load_dem_data(DEM_FILE_PATH)
-
-if Z is not None:
-    
-    # --- 關鍵診斷點 B：再次確認 Z 陣列的有效性 ---
-    if Z.size == 0 or np.all(np.isnan(Z)):
-        st.error("錯誤：讀取到的高程陣列是空的或全部為 NoData 值。請檢查您的 TIF 檔案內容。")
-        st.stop()
-    # --- 關鍵診斷點 B 結束 ---
-    
-    # 處理 DEM 數據中常見的 NoData 值
-    # 將所有小於 0 的值 (常見的 NoData 標記) 替換為 NaN
-    Z[Z < 0] = np.nan 
-    
-    # --- 2. 建立 3D Surface 圖 ---
-    fig = go.Figure(
-        data=[
-            go.Surface(
-                z=Z,                   # 讀取到的高程陣列 (Z 軸)
-                x=lon_coords,          # 經度/X 座標 (X 軸)
-                y=lat_coords,          # 緯度/Y 座標 (Y 軸)
-                
-                # 讓 Z 軸的顏色依據高度變化
-                colorscale="Terrain",  # 適合地形的顏色漸層
-                showscale=True,
-                colorbar_title='海拔 (公尺)' # 顏色條標題
-            )
-        ]
-    )
-
-    # --- 3. 調整 3D 視角和外觀 ---
-    fig.update_layout(
-        title=f"台灣地形 3D 曲面圖 (坐標系: {crs_name})",
-        width=None,
-        height=700,
-        scene=dict(
-            xaxis_title='經度 / X 座標',
-            yaxis_title='緯度 / Y 座標',
-            zaxis_title='海拔高度 (公尺)',
-            
-            # 調整視覺比例，讓垂直高度 (Z) 略微誇張，以增強視覺效果
-            aspectratio=dict(x=1, y=1, z=0.4), 
-            aspectmode='manual'
+# --- 2. 建立 3D Surface 圖 ---
+# 建立一個 Plotly 的 Figure 物件，它是所有圖表元素的容器
+fig = go.Figure(
+    # data 參數接收一個包含所有 "trace" (圖形軌跡) 的列表。
+    # 每個 trace 定義了一組數據以及如何繪製它。
+    data=[
+        # 建立一個 Surface (曲面) trace
+        go.Surface(
+            x=x.values,
+            y=y.values,
+            z=GRID_CODE.values,
+            colorscale="Viridis"
         )
+    ] # data 列表結束
+)
+
+# --- 3. 調整 3D 視角和外觀 ---
+# 使用 update_layout 方法來修改圖表的整體佈局和外觀設定
+fig.update_layout(
+    # 設定圖表的標題文字
+    title="Mt. Bruno 火山 3D 地形圖 (可旋轉)",
+
+    # 設定圖表的寬度和高度 (單位：像素)
+    width=800,
+    height=700,
+
+    # scene 參數是一個字典，用於配置 3D 圖表的場景 (座標軸、攝影機視角等)
+    scene=dict(
+        # 設定 X, Y, Z 座標軸的標籤文字
+        xaxis_title='X',
+        yaxis_title='Y',
+        zaxis_title='海拔 (Z)'
+        # 可以在 scene 字典中加入更多參數來控制攝影機初始位置、座標軸範圍等
     )
+)
 
-    # --- 4. 在 Streamlit 中顯示 ---
-    st.plotly_chart(fig, use_container_width=True)
+# 這段程式碼執行後，變數 `fig` 將包含一個設定好的 3D Surface Plotly 圖表物件。
+# 你可以接著使用 fig.show() 或 st.plotly_chart(fig) 將其顯示出來。
+# 這個圖表通常是互動式的，允許使用者用滑鼠旋轉、縮放和平移 3D 視角。
 
-    # 顯示一些數據資訊
-    st.sidebar.header("DEM 數據資訊")
-    st.sidebar.write(f"陣列維度 (Cols x Rows): {Z.shape[1]} x {Z.shape[0]}")
-    st.sidebar.write(f"座標系統: {crs_name}")
-    st.sidebar.write(f"最大高度: {np.nanmax(Z):.2f} 公尺")
-    st.sidebar.write(f"最小高度: {np.nanmin(Z):.2f} 公尺")
+# --- 4. 在 Streamlit 中顯示 ---
+st.plotly_chart(fig)
