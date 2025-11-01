@@ -32,7 +32,7 @@ layer_hexagon = pdk.Layer(
     'HexagonLayer',
     data=data,
     get_position=f'[{lon_col}, {lat_col}]', 
-    radius=100,
+    radius=2000,
     elevation_scale=4,
     elevation_range=[0, 1000],
     pickable=True,
