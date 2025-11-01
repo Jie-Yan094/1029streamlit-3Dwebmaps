@@ -108,7 +108,7 @@ layer_grid = pdk.Layer(
 view_state_grid = pdk.ViewState(
     latitude=base_lat, 
     longitude=base_lon, 
-    zoom=13, # 提高 zoom 級別，讓您能看清網格細節
+    zoom=10, # 提高 zoom 級別，讓您能看清網格細節
     pitch=50
 )
 
