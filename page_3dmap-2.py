@@ -4,12 +4,13 @@ import plotly.graph_objects as go
 import pandas as pd
 import rasterio
 import numpy as np # 導入 numpy 用於處理 NaN
+import streamlit as st
+import pandas as pd
+import plotly.express as px
 
 st.title("Plotly 3D 地圖 (向量 - 地球儀)")
+
 # --- 0. 建立中文國家名稱到 ISO 3 碼的對應字典 ---
-# 這是繪製地圖的關鍵，Plotly 需要標準代碼 (ISO 3-letter codes)
-# 由於您的資料包含多個國家，我將根據常見的國家名稱補齊必要的對應。
-# 請在實際運行前，確認此字典涵蓋了您所有需要的 '國別'。
 chinese_to_iso = {
     "中華民國": "TWN",
     "日本": "JPN",
@@ -28,10 +29,10 @@ chinese_to_iso = {
     # 如果您的資料還有其他國家，請在這裡手動加入它們的 ISO 3 碼
 }
 
-# --- 1. 載入資料並篩選年份 ---
+# --- 1. 載入完整資料 ---
 try:
     # 使用 'encoding="utf-8"' 確保中文讀取正常
-    df = pd.read_csv('老化指數.csv', encoding='utf-8').query("西元年 == 2020")
+    df_full = pd.read_csv('老化指數.csv', encoding='utf-8')
 except FileNotFoundError:
     st.error("找不到 '老化指數.csv' 檔案，請確認檔案路徑。")
     st.stop()
@@ -39,33 +40,53 @@ except FileNotFoundError:
 # --- 1.5 資料清理與轉換 (解決 TypeError 和地理定位問題) ---
 
 # A. 清理 '老化指數' (解決 TypeError)
-# 將 '老化指數' 轉換為數值，無法轉換的設為 NaN
-df['老化指數_cleaned'] = pd.to_numeric(df['老化指數'], errors='coerce')
+# 必須對完整資料集進行此操作
+df_full['老化指數_cleaned'] = pd.to_numeric(df_full['老化指數'], errors='coerce')
 
 # B. 轉換 '國別' 欄位 (解決地理定位問題)
 # 建立一個新的 ISO 代碼欄位
-df['iso_alpha'] = df['國別'].map(chinese_to_iso)
+df_full['iso_alpha'] = df_full['國別'].map(chinese_to_iso)
 
-# C. 移除包含錯誤或缺失資料的行
-# 移除 '老化指數' 為 NaN (無法計算大小) 或 'iso_alpha' 為 NaN (無法定位) 的行
-df.dropna(subset=['老化指數_cleaned', 'iso_alpha'], inplace=True)
+# C. 移除包含錯誤或缺失資料的行 (基於必要的欄位)
+df_cleaned = df_full.dropna(subset=['老化指數_cleaned', 'iso_alpha', '西元年'])
 
-# 檢查是否有資料可以繪製
-if df.empty:
-    st.warning("篩選和清洗後，2020 年的資料集為空，無法繪圖。請檢查篩選條件或資料內容。")
+# 確保 '西元年' 是整數類型，以便後續選取
+df_cleaned['西元年'] = df_cleaned['西元年'].astype(int)
+
+# --- 2. 使用者選擇年份 ---
+available_years = sorted(df_cleaned['西元年'].unique(), reverse=True)
+
+if not available_years:
+    st.warning("資料集中找不到有效的年份資料，無法繪圖。")
     st.stop()
 
-# --- 2. 建立 3D 地理散點圖 (scatter_geo) ---
-# 由於我們處理的是亞洲/歐洲國家，'orthographic' 投影可能需要調整視角才能看到所有點
+# 預設選擇最新的年份 (或您可以設定為 2020)
+default_year = 2020 if 2020 in available_years else available_years[0]
+
+selected_year = st.selectbox(
+    "請選擇要顯示的年份:",
+    options=available_years,
+    index=available_years.index(default_year) if default_year in available_years else 0
+)
+
+# --- 3. 根據選擇的年份篩選資料 ---
+df_plot = df_cleaned[df_cleaned['西元年'] == selected_year].copy()
+
+# 檢查是否有資料可以繪製
+if df_plot.empty:
+    st.warning(f"{selected_year} 年的資料集為空或資料不完整，無法繪圖。請嘗試選擇其他年份。")
+    st.stop()
+
+# --- 4. 建立 3D 地理散點圖 (scatter_geo) ---
 fig = px.scatter_geo(
-    df,
+    df_plot,
     locations="iso_alpha",          # 使用標準的 ISO 3 國家代碼
     locationmode='ISO-3',           # 告訴 Plotly 這些是 ISO 3 碼
     color="國別",                   # 依據國家名稱上色
     hover_name="國別",              # 滑鼠懸停時顯示國家名稱
     size="老化指數_cleaned",        # 點的大小代表清洗後的數值
     projection="orthographic",      # 建立 3D 地球儀效果
-    title="2020年 各國老化指數分佈 (3D 地球儀)"
+    title=f"{selected_year}年 各國老化指數分佈 (3D 地球儀)"
 )
 
 # 調整視角，確保地球儀不會完全看不到資料點（可選）
@@ -78,9 +99,8 @@ fig.update_geos(
     landcolor="LightGreen"
 )
 
-# --- 3. 在 Streamlit 中顯示 ---
+# --- 5. 在 Streamlit 中顯示 ---
 st.plotly_chart(fig, use_container_width=True)
-
 st.title("Plotly 3D 地圖 (網格 - DEM 表面)")
 
 # --- 1. 讀取範例 DEM 資料 ---
