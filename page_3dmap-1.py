@@ -34,7 +34,7 @@ layer_hexagon = pdk.Layer(
     get_position=f'[{lon_col}, {lat_col}]', 
     
     # ⬇️ 關鍵調整點：嘗試改變這個數值 ⬇️
-    radius=700, # 嘗試從 300 調整為 400 或 200 
+    radius=1000, # 嘗試從 300 調整為 400 或 200 
     
     elevation_scale=5,
     elevation_range=[0, 1000],
