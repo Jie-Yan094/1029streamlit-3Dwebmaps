@@ -4,53 +4,45 @@ import numpy as np
 import pydeck as pdk
 
 st.title("Pydeck 3D 地圖 (向量 - 密度圖)")
-# --- 1. 讀取醫院資料 ---
-# --- 1. 讀取醫院資料 ---
+# --- 1. 讀取醫院資料 (假設此處已成功運行並讀取到 36 筆資料) ---
+# 為了完整性，我重貼讀取邏輯，請確保它運行正常
 try:
-    # 讀取您上傳的 CSV 檔案
     data = pd.read_csv("臺北市公私立醫院-114.07.csv")
-    
-    # 確定欄位名稱
     lat_col = '緯度'
     lon_col = '經度'
     
-    # 計算中心點
+    # 檢查筆數 (請在 Streamlit 運行時觀察此輸出)
+    st.write(f"【數據檢查】成功載入 {len(data)} 筆資料。") 
+    
     center_lat = data[lat_col].mean()
     center_lon = data[lon_col].mean()
-
+    
 except Exception as e:
-    st.error(f"讀取 CSV 失敗，請檢查檔案路徑或欄位名稱: {e}")
-    # 如果失敗，使用一個預設的臺北中心點作為備用
-    center_lat = 25.0478
-    center_lon = 121.5170
-    data = pd.DataFrame({'lat': [25.0478], 'lon': [121.5170]}) # 備用空資料
+    st.error(f"讀取 CSV 失敗: {e}")
+    # 備用數據，若運行環境無法找到 CSV 檔案
+    data = pd.DataFrame({'lat': [25.0478], 'lon': [121.5170]})
     lat_col = 'lat'
     lon_col = 'lon'
+    center_lat = 25.0478
+    center_lon = 121.5170
 
-st.write("--- 數據載入檢查 ---")
-st.write(f"成功載入的資料筆數: {len(data)}")
-st.dataframe(data.head()) # 顯示前五筆資料
-st.write("--- 數據載入檢查結束 ---")
 
 # --- 2. 設定 Pydeck 圖層 (Layer) ---
 layer_hexagon = pdk.Layer(
     'HexagonLayer',
     data=data,
-    # 使用 CSV 中的實際欄位名稱
     get_position=f'[{lon_col}, {lat_col}]', 
-    radius=300, # 調整半徑，300 米適合市區醫院點的密度分佈
+    
+    # ⬇️ 關鍵調整點：嘗試改變這個數值 ⬇️
+    radius=400, # 嘗試從 300 調整為 400 或 200 
+    
     elevation_scale=5,
     elevation_range=[0, 1000],
     pickable=True,
     extruded=True,
-    # 設定顏色，讓密度高的區域顏色更深或更高
     color_range=[
-        [255, 255, 178, 20],  # 淡黃
-        [255, 237, 160, 100],
-        [254, 201, 128, 150],
-        [252, 141, 60, 180],
-        [227, 76, 76, 210],
-        [189, 0, 38, 255]   # 紅色 (最高密度)
+        [255, 255, 178, 20], [255, 237, 160, 100], [254, 201, 128, 150],
+        [252, 141, 60, 180], [227, 76, 76, 210], [189, 0, 38, 255]
     ]
 )
 
@@ -58,7 +50,7 @@ layer_hexagon = pdk.Layer(
 view_state_hexagon = pdk.ViewState(
     latitude=center_lat,
     longitude=center_lon,
-    zoom=11.5, # 稍微放大一點以涵蓋整個臺北市
+    zoom=11, # ⬇️ 嘗試調低 zoom，拉遠地圖
     pitch=50,
 )
 
@@ -66,7 +58,6 @@ view_state_hexagon = pdk.ViewState(
 r_hexagon = pdk.Deck(
     layers=[layer_hexagon],
     initial_view_state=view_state_hexagon,
-    # 提示文字顯示該區域的醫院數量
     tooltip={"text": "此區域共有 {elevationValue} 家醫院"} 
 )
 
