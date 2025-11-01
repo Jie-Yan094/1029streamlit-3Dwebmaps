@@ -2,80 +2,67 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pydeck as pdk
-import geopandas as gpd
 
 st.title("Pydeck 3D 地圖 (向量 - 密度圖)")
-# --- 1. 讀取真實的地理空間資料 (Shapefile) ---
-
-# ⚠️ 注意: 請將「臺北市老舊聚落分布圖 (WGS84座標).zip」
-#         放在與此 Python 腳本相同的目錄下執行。
+# --- 1. 讀取醫院資料 ---
 try:
-    zip_filename = "臺北市老舊聚落分布圖 (WGS84座標).zip"
+    # 讀取您上傳的 CSV 檔案
+    data = pd.read_csv("臺北市公私立醫院-114.07.csv")
     
-    # 1.1 GeoPandas 可以直接從 zip 檔案讀取 Shapefile
-    gdf = gpd.read_file(f"zip://{zip_filename}")
+    # 確定經緯度欄位名稱 (根據 CSV 內容)
+    lat_col = '緯度'
+    lon_col = '經度'
     
-    # 1.2 從 GeoDataFrame 的幾何欄位 (geometry) 提取經度和緯度
-    #     Pydeck 需要單獨的 lon/lat 欄位
-    gdf['lon'] = gdf.geometry.x
-    gdf['lat'] = gdf.geometry.y
-    
-    # 1.3 準備 Pydeck 所需的 DataFrame
-    #     我們只保留需要的欄位 (經度、緯度和其他屬性)
-    data = pd.DataFrame(gdf.drop(columns=['geometry']))
-    
-    # 設定欄位名稱
-    lon_col = 'lon'
-    lat_col = 'lat'
-
-    # 設定地圖中心點 (取數據的平均值作為中心點)
+    # 計算數據的中心點，讓地圖預設視角更準確
     center_lat = data[lat_col].mean()
     center_lon = data[lon_col].mean()
     
 except Exception as e:
-    st.error(f"讀取 Shapefile 失敗或 GeoPandas 錯誤，請檢查 ZIP 檔案路徑或 GeoPandas 安裝: {e}")
-    st.info("暫時使用隨機資料顯示地圖。")
-    
-    # 如果讀取失敗，使用原程式碼的隨機資料作為備用
-    data = pd.DataFrame({
-        'lat': 25.0478 + np.random.randn(1000) / 50,
-        'lon': 121.5170 + np.random.randn(1000) / 50,
-    })
-    lon_col = 'lon'
-    lat_col = 'lat'
+    st.error(f"讀取 CSV 失敗，請檢查檔案路徑或欄位名稱: {e}")
+    # 如果失敗，使用一個預設的臺北中心點作為備用
     center_lat = 25.0478
-    center_lon = 121.5170 # 台北市預設中心
+    center_lon = 121.5170
+    data = pd.DataFrame({'lat': [25.0478], 'lon': [121.5170]}) # 備用空資料
+    lat_col = 'lat'
+    lon_col = 'lon'
+
 
 # --- 2. 設定 Pydeck 圖層 (Layer) ---
 layer_hexagon = pdk.Layer(
     'HexagonLayer',
     data=data,
-    # 使用提取出的經緯度欄位
+    # 使用 CSV 中的實際欄位名稱
     get_position=f'[{lon_col}, {lat_col}]', 
-    radius=200, # 調整半徑以適應臺北市範圍
+    radius=300, # 調整半徑，300 米適合市區醫院點的密度分佈
     elevation_scale=5,
     elevation_range=[0, 1000],
     pickable=True,
     extruded=True,
-    # 可選: 調整顏色主題
-    # color_range=[[r, g, b, 255], ...]
+    # 設定顏色，讓密度高的區域顏色更深或更高
+    color_range=[
+        [255, 255, 178, 20],  # 淡黃
+        [255, 237, 160, 100],
+        [254, 201, 128, 150],
+        [252, 141, 60, 180],
+        [227, 76, 76, 210],
+        [189, 0, 38, 255]   # 紅色 (最高密度)
+    ]
 )
 
 # --- 3. 設定攝影機視角 (View State) ---
 view_state_hexagon = pdk.ViewState(
-    # 使用計算出的數據中心點，讓地圖更精確
     latitude=center_lat,
     longitude=center_lon,
-    zoom=12,
+    zoom=11.5, # 稍微放大一點以涵蓋整個臺北市
     pitch=50,
 )
 
-# --- 4. 組合圖層和視角並顯示 (第一個地圖) ---
+# --- 4. 組合圖層和視角並顯示 ---
 r_hexagon = pdk.Deck(
     layers=[layer_hexagon],
     initial_view_state=view_state_hexagon,
-    # HexagonLayer 的 elevationValue 代表該六邊形內包含的點數量
-    tooltip={"text": "此區域有 {elevationValue} 個老舊聚落"} 
+    # 提示文字顯示該區域的醫院數量
+    tooltip={"text": "此區域共有 {elevationValue} 家醫院"} 
 )
 
 st.pydeck_chart(r_hexagon)
