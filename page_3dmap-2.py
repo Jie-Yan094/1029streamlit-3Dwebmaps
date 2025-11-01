@@ -86,45 +86,61 @@ st.title("Plotly 3D 地圖 (網格 - DEM 表面)")
 # --- 1. 讀取範例 DEM 資料 ---
 z_data = pd.read_csv("taipie.csv")
 
+# ----------------------------------------------------
+# ⚠️ 修正 NameError 的關鍵步驟：定義 x, y, z 變數 ⚠️
+#    將 CSV 中的欄位提取為 Series
+# ----------------------------------------------------
+# X 軸數據：使用 'Row' 欄位
+x = z_data['X']
+
+# Y 軸數據：使用 'Column' 欄位
+y = z_data['Y']
+
+# Z 軸數據（高程）：使用 'Value' 欄位
+z = z_data['GRID_CODE'] 
+# ----------------------------------------------------
+
+
 # --- 2. 建立 3D Surface 圖 ---
-# 建立一個 Plotly 的 Figure 物件，它是所有圖表元素的容器
+# 為了繪製 3D 表面圖，Plotly 要求 x, y, z 數據必須是『矩陣 (Matrix)』結構，
+# 而不是我們現在的『點列表 (List of Points)』結構。
+# 我們需要使用 .pivot() 將 Row/Column/Value 的點列表轉換為矩陣。
+
+# 2.1 進行資料透視 (Pivot) 轉換為矩陣結構
+z_matrix = z_data.pivot(index='X', columns='Y', values='GRID_CODE')
+
+# 2.2 從矩陣中提取 x, y, z 數據
+# 提取 x (Columns 標籤), y (Index 標籤), z (Value 矩陣)
+x_data = z_matrix.columns
+y_data = z_matrix.index
+z_data_matrix = z_matrix.values
+
+# 建立一個 Plotly 的 Figure 物件
 fig = go.Figure(
-    # data 參數接收一個包含所有 "trace" (圖形軌跡) 的列表。
-    # 每個 trace 定義了一組數據以及如何繪製它。
     data=[
         # 建立一個 Surface (曲面) trace
         go.Surface(
-            x=x.values,
-            y=y.values,
-            z=GRID_CODE.values,
+            # 使用轉換後的矩陣數據
+            x=x_data,             # X 座標
+            y=y_data,             # Y 座標
+            z=z_data_matrix,      # Z 數值（高程矩陣）
             colorscale="Viridis"
         )
-    ] # data 列表結束
+    ]
 )
 
 # --- 3. 調整 3D 視角和外觀 ---
-# 使用 update_layout 方法來修改圖表的整體佈局和外觀設定
+# ... (此處程式碼保持不變) ...
 fig.update_layout(
-    # 設定圖表的標題文字
-    title="Mt. Bruno 火山 3D 地形圖 (可旋轉)",
-
-    # 設定圖表的寬度和高度 (單位：像素)
+    title="DEM 表面 3D 圖 (可旋轉)", # 建議修改標題以符合資料內容
     width=800,
     height=700,
-
-    # scene 參數是一個字典，用於配置 3D 圖表的場景 (座標軸、攝影機視角等)
     scene=dict(
-        # 設定 X, Y, Z 座標軸的標籤文字
-        xaxis_title='X',
-        yaxis_title='Y',
-        zaxis_title='海拔 (Z)'
-        # 可以在 scene 字典中加入更多參數來控制攝影機初始位置、座標軸範圍等
+        xaxis_title='Row Index (X)', # 由於您使用 Row/Column，建議修改標籤
+        yaxis_title='Column Index (Y)',
+        zaxis_title='海拔/高程 (Z)'
     )
 )
-
-# 這段程式碼執行後，變數 `fig` 將包含一個設定好的 3D Surface Plotly 圖表物件。
-# 你可以接著使用 fig.show() 或 st.plotly_chart(fig) 將其顯示出來。
-# 這個圖表通常是互動式的，允許使用者用滑鼠旋轉、縮放和平移 3D 視角。
 
 # --- 4. 在 Streamlit 中顯示 ---
 st.plotly_chart(fig)
