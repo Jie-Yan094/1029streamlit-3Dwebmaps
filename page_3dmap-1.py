@@ -62,34 +62,39 @@ st.pydeck_chart(r_hexagon)
 # ===============================================
 
 st.title("Pydeck 3D 地圖 (網格 - DEM 模擬)")
-
-# --- 1. 讀取範例 DEM 資料 ---
-z_data = pd.read_csv("taipie.csv")
-X_COL = 'X' 
-Y_COL = 'Y' 
-Z_COL = 'GRID_CODE'
-# 1.2 進行資料透視 (Pivot) 轉換，將長格式數據轉為矩陣
-# 我們以 Y 為索引 (Row)，X 為欄位 (Column)，GRID_CODE 為數值
+# --- 1. 讀取範例 DEM 資料 (taipie.csv) ---
 try:
+    z_data = pd.read_csv("taipie.csv")
+except FileNotFoundError:
+    st.error("找不到 'taipie.csv' 檔案，請確認檔案路徑正確。")
+    st.stop()
+
+# ----------------------------------------------------
+# 關鍵修正：將點資料轉換為 Plotly 要求的二維矩陣 (Matrix)
+# ----------------------------------------------------
+X_COL = 'X'          # 對應您的 X 軸數據
+Y_COL = 'Y'          # 對應您的 Y 軸數據
+Z_COL = 'GRID_CODE'  # 對應您的高程 Z 軸數據
+
+try:
+    # 進行資料透視 (Pivot) 轉換
+    # 以 Y 為索引 (Row)，X 為欄位 (Column)，GRID_CODE 為數值
     z_matrix = z_data.pivot(index=Y_COL, columns=X_COL, values=Z_COL)
     
-    # 1.3 提取用於繪圖的軸數據和 Z 矩陣
-    # x_data (水平軸，對應列)
+    # 提取繪圖所需的數據
     x_data = z_matrix.columns.values 
-    # y_data (垂直軸，對應索引)
     y_data = z_matrix.index.values
-    # z_data_matrix (高程矩陣)
     z_values = z_matrix.values
 
 except Exception as e:
-    st.error(f"無法將 CSV 資料轉換為矩陣結構，請檢查 X, Y, GRID_CODE 欄位名稱是否正確: {e}")
-    # 為了防止程式崩潰，這裡建議退出或使用簡單圖表，但請您優先檢查欄位名稱
+    st.error(f"資料轉換失敗。請檢查 'taipie.csv' 是否包含唯一的 X, Y 組合，且欄位名稱是否為 '{X_COL}', '{Y_COL}', '{Z_COL}'。錯誤: {e}")
     st.stop()
 
 
 # --- 2. 建立 3D Surface 圖 ---
 fig = go.Figure(
     data=[
+        # 建立一個 Surface (曲面) trace
         go.Surface(
             x=x_data,
             y=y_data,
@@ -101,7 +106,7 @@ fig = go.Figure(
 
 # --- 3. 調整 3D 視角和外觀 ---
 fig.update_layout(
-    # 設定圖表的標題文字 (改為符合資料內容)
+    # 設定圖表的標題文字
     title="臺北地區 DEM 3D 地形圖 (GRID_CODE 作為高程)",
 
     # 設定圖表的寬度和高度 (單位：像素)
@@ -111,8 +116,8 @@ fig.update_layout(
     # scene 字典用於配置 3D 圖表的場景
     scene=dict(
         # 設定 X, Y, Z 座標軸的標籤文字
-        xaxis_title='X 座標 (經度)',
-        yaxis_title='Y 座標 (緯度)',
+        xaxis_title='X 座標',
+        yaxis_title='Y 座標',
         zaxis_title='高程 (GRID_CODE)'
     )
 )
