@@ -43,7 +43,7 @@ layer_hexagon = pdk.Layer(
 view_state_hexagon = pdk.ViewState(
     latitude=center_lat,
     longitude=center_lon,
-    zoom=6,
+    zoom=8,
     pitch=50,
 )
 
