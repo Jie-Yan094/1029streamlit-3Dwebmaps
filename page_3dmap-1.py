@@ -5,18 +5,19 @@ import pydeck as pdk
 
 st.title("Pydeck 3D 地圖 (向量 - 密度圖)")
 # --- 1. 讀取醫院資料 ---
+# --- 1. 讀取醫院資料 ---
 try:
     # 讀取您上傳的 CSV 檔案
     data = pd.read_csv("臺北市公私立醫院-114.07.csv")
     
-    # 確定經緯度欄位名稱 (根據 CSV 內容)
+    # 確定欄位名稱
     lat_col = '緯度'
     lon_col = '經度'
     
-    # 計算數據的中心點，讓地圖預設視角更準確
+    # 計算中心點
     center_lat = data[lat_col].mean()
     center_lon = data[lon_col].mean()
-    
+
 except Exception as e:
     st.error(f"讀取 CSV 失敗，請檢查檔案路徑或欄位名稱: {e}")
     # 如果失敗，使用一個預設的臺北中心點作為備用
@@ -26,6 +27,10 @@ except Exception as e:
     lat_col = 'lat'
     lon_col = 'lon'
 
+st.write("--- 數據載入檢查 ---")
+st.write(f"成功載入的資料筆數: {len(data)}")
+st.dataframe(data.head()) # 顯示前五筆資料
+st.write("--- 數據載入檢查結束 ---")
 
 # --- 2. 設定 Pydeck 圖層 (Layer) ---
 layer_hexagon = pdk.Layer(
