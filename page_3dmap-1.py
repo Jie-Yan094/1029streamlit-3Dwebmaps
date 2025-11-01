@@ -6,6 +6,7 @@ import pydeck as pdk
 st.title("Pydeck 3D 地圖 (向量 - 密度圖)")
 # --- 1. 讀取醫院資料 (假設此處已成功運行並讀取到 36 筆資料) ---
 # 為了完整性，我重貼讀取邏輯，請確保它運行正常
+st.write("臺北市公私立醫院資料密度圖")
 try:
     data = pd.read_csv("臺北市公私立醫院-114.07.csv")
     lat_col = '緯度'
@@ -62,43 +63,59 @@ st.pydeck_chart(r_hexagon)
 
 st.title("Pydeck 3D 地圖 (網格 - DEM 模擬)")
 
-# --- 1. 模擬 DEM 網格資料 ---
-x, y = np.meshgrid(np.linspace(-1, 1, 50), np.linspace(-1, 1, 50))
-z = np.exp(-(x**2 + y**2) * 2) * 1000
+# --- 1. 讀取範例 DEM 資料 ---
+z_data = pd.read_csv("taipie.csv")
+X_COL = 'X' 
+Y_COL = 'Y' 
+Z_COL = 'GRID_CODE'
+# 1.2 進行資料透視 (Pivot) 轉換，將長格式數據轉為矩陣
+# 我們以 Y 為索引 (Row)，X 為欄位 (Column)，GRID_CODE 為數值
+try:
+    z_matrix = z_data.pivot(index=Y_COL, columns=X_COL, values=Z_COL)
+    
+    # 1.3 提取用於繪圖的軸數據和 Z 矩陣
+    # x_data (水平軸，對應列)
+    x_data = z_matrix.columns.values 
+    # y_data (垂直軸，對應索引)
+    y_data = z_matrix.index.values
+    # z_data_matrix (高程矩陣)
+    z_values = z_matrix.values
 
-data_dem_list = [] # 修正: 建立一個列表來收集字典
-base_lat, base_lon = 25.0, 121.5
-for i in range(50):
-    for j in range(50):
-        data_dem_list.append({ # 修正: 將字典附加到列表中
-            "lon": base_lon + x[i, j] * 0.1,
-            "lat": base_lat + y[i, j] * 0.1,
-            "elevation": z[i, j]
-        })
-df_dem = pd.DataFrame(data_dem_list) # 從列表創建 DataFrame
+except Exception as e:
+    st.error(f"無法將 CSV 資料轉換為矩陣結構，請檢查 X, Y, GRID_CODE 欄位名稱是否正確: {e}")
+    # 為了防止程式崩潰，這裡建議退出或使用簡單圖表，但請您優先檢查欄位名稱
+    st.stop()
 
-# --- 2. 設定 Pydeck 圖層 (GridLayer) ---
-layer_grid = pdk.Layer( # 稍微改個名字避免混淆
-    'GridLayer',
-    data=df_dem,
-    get_position='[lon, lat]',
-    get_elevation_weight='elevation', # 使用 'elevation' 欄位當作高度
-    elevation_scale=1,
-    cell_size=2000,
-    extruded=True,
-    pickable=True # 加上 pickable 才能顯示 tooltip
+
+# --- 2. 建立 3D Surface 圖 ---
+fig = go.Figure(
+    data=[
+        go.Surface(
+            x=x_data,
+            y=y_data,
+            z=z_values,
+            colorscale="Viridis"
+        )
+    ]
 )
 
-# --- 3. 設定視角 (View) ---
-view_state_grid = pdk.ViewState( # 稍微改個名字避免混淆
-    latitude=base_lat, longitude=base_lon, zoom=10, pitch=50
+# --- 3. 調整 3D 視角和外觀 ---
+fig.update_layout(
+    # 設定圖表的標題文字 (改為符合資料內容)
+    title="臺北地區 DEM 3D 地形圖 (GRID_CODE 作為高程)",
+
+    # 設定圖表的寬度和高度 (單位：像素)
+    width=800,
+    height=700,
+
+    # scene 字典用於配置 3D 圖表的場景
+    scene=dict(
+        # 設定 X, Y, Z 座標軸的標籤文字
+        xaxis_title='X 座標 (經度)',
+        yaxis_title='Y 座標 (緯度)',
+        zaxis_title='高程 (GRID_CODE)'
+    )
 )
 
-# --- 4. 組合並顯示 (第二個地圖) ---
-r_grid = pdk.Deck( # 稍微改個名字避免混淆
-    layers=[layer_grid],
-    initial_view_state=view_state_grid,
-    # mapbox_key=MAPBOX_KEY, # <--【修正點】移除這裡的 mapbox_key
-    tooltip={"text": "海拔高度: {elevationValue} 公尺"} # GridLayer 用 elevationValue
-)
-st.pydeck_chart(r_grid)
+# --- 4. 在 Streamlit 中顯示 ---
+st.plotly_chart(fig)
